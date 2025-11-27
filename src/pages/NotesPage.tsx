@@ -1,0 +1,424 @@
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import {
+  FileText,
+  Wand2,
+  Loader2,
+  AlertCircle,
+  ArrowLeft,
+  Upload,
+  X,
+  Copy,
+  Check,
+  Download,
+  Image as ImageIcon,
+} from "lucide-react";
+import type { Provider } from "../types";
+
+const PROMPT = `You are an expert OCR system. Extract ALL text from this image exactly as written.
+
+Return the extracted text in this JSON format:
+{
+  "title": "Document title if visible (optional)",
+  "content": "The full extracted text content",
+  "type": "letter/memo/note/other",
+  "date": "Date if visible (optional)",
+  "from": "Sender if visible (optional)",
+  "to": "Recipient if visible (optional)"
+}
+
+IMPORTANT:
+- Preserve the original formatting and line breaks where possible
+- Extract ALL text visible in the image
+- Handle handwritten text carefully
+- Return ONLY valid JSON`;
+
+async function extractNotes(
+  file: File,
+  apiKey: string
+): Promise<{ title?: string; content: string; type?: string; date?: string; from?: string; to?: string }> {
+  const arrayBuffer = await file.arrayBuffer();
+  const base64Image = btoa(
+    new Uint8Array(arrayBuffer).reduce(
+      (data, byte) => data + String.fromCharCode(byte),
+      ""
+    )
+  );
+  const mimeType = file.type || "image/jpeg";
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: PROMPT },
+              { inline_data: { mime_type: mimeType, data: base64Image } },
+            ],
+          },
+        ],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 8192 },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`API Error: ${error}`);
+  }
+
+  const result = await response.json();
+  const textContent = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  if (!textContent) throw new Error("No response from AI");
+
+  let jsonStr = textContent;
+  const jsonMatch = textContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (jsonMatch) jsonStr = jsonMatch[1];
+
+  return JSON.parse(jsonStr.trim());
+}
+
+export function NotesPage() {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [extractedData, setExtractedData] = useState<{
+    title?: string;
+    content: string;
+    type?: string;
+    date?: string;
+    from?: string;
+    to?: string;
+  } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleFile = (file: File) => {
+    if (file.type.startsWith("image/")) {
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => setPreview(e.target?.result as string);
+      reader.readAsDataURL(file);
+      setError(null);
+    }
+  };
+
+  const clearFile = () => {
+    setSelectedFile(null);
+    setPreview(null);
+    setExtractedData(null);
+  };
+
+  const handleExtract = async () => {
+    if (!selectedFile) {
+      setError("Please select an image");
+      return;
+    }
+    if (!apiKey) {
+      setError("Please enter your API key");
+      return;
+    }
+
+    setError(null);
+    setIsLoading(true);
+    setExtractedData(null);
+
+    try {
+      const data = await extractNotes(selectedFile, apiKey);
+      setExtractedData(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to extract text");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCopy = async () => {
+    if (extractedData?.content) {
+      await navigator.clipboard.writeText(extractedData.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleDownload = () => {
+    if (!extractedData) return;
+    const text = `${extractedData.title ? `Title: ${extractedData.title}\n` : ""}${extractedData.date ? `Date: ${extractedData.date}\n` : ""}${extractedData.from ? `From: ${extractedData.from}\n` : ""}${extractedData.to ? `To: ${extractedData.to}\n` : ""}\n${extractedData.content}`;
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "extracted-text.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="min-h-screen bg-[hsl(var(--background))]">
+      {/* Header */}
+      <header className="border-b border-white/10 bg-black/50 backdrop-blur-xl sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link
+              to="/app"
+              className="flex items-center gap-2 text-gray-400 hover:text-white transition"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </Link>
+            <div className="w-px h-6 bg-white/10" />
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-purple-500" />
+              <span className="font-semibold">DocuScan</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-5xl mx-auto px-6 py-12">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-12"
+        >
+          <h1 className="text-3xl font-bold mb-2">Extract Notes & Letters</h1>
+          <p className="text-gray-400">
+            Upload an image of handwritten or printed text
+          </p>
+        </motion.div>
+
+        <div className="grid lg:grid-cols-2 gap-8">
+          {/* Left Column - Upload */}
+          <div className="space-y-6">
+            {/* Upload Area */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="glass-card rounded-2xl p-6"
+            >
+              <div
+                className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
+                  isDragging
+                    ? "border-blue-500 bg-blue-500/10"
+                    : "border-white/10 hover:border-white/30"
+                }`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  const file = e.dataTransfer.files[0];
+                  if (file) handleFile(file);
+                }}
+                onClick={() => document.getElementById("fileInput")?.click()}
+              >
+                {preview ? (
+                  <div className="relative">
+                    <img
+                      src={preview}
+                      alt="Preview"
+                      className="max-h-48 mx-auto rounded-lg"
+                    />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        clearFile();
+                      }}
+                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="w-10 h-10 text-gray-500 mx-auto mb-4" />
+                    <p className="text-gray-400 mb-1">
+                      Drop your note or letter here
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      Supports JPG, PNG, WebP
+                    </p>
+                  </>
+                )}
+                <input
+                  type="file"
+                  id="fileInput"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFile(file);
+                  }}
+                  capture="environment"
+                />
+              </div>
+              {selectedFile && (
+                <p className="text-sm text-gray-500 mt-3 flex items-center gap-2">
+                  <ImageIcon size={14} />
+                  {selectedFile.name}
+                </p>
+              )}
+            </motion.div>
+
+            {/* Extract Button */}
+            <motion.button
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              onClick={handleExtract}
+              disabled={!selectedFile || isLoading}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl font-medium transition flex items-center justify-center gap-2"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="animate-spin" size={20} />
+                  Extracting...
+                </>
+              ) : (
+                <>
+                  <Wand2 size={20} />
+                  Extract Text
+                </>
+              )}
+            </motion.button>
+
+            {error && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-3 text-red-400"
+              >
+                <AlertCircle size={20} />
+                <span className="text-sm">{error}</span>
+              </motion.div>
+            )}
+          </div>
+
+          {/* Right Column - Results */}
+          <div className="space-y-6">
+            {isLoading && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="glass-card rounded-2xl p-12 text-center"
+              >
+                <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4 text-blue-500" />
+                <p className="text-gray-400">Reading your document...</p>
+              </motion.div>
+            )}
+
+            {extractedData && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                {/* Metadata */}
+                {(extractedData.title || extractedData.date || extractedData.from || extractedData.to) && (
+                  <div className="glass-card rounded-2xl p-6">
+                    <h3 className="text-sm font-medium text-gray-400 mb-4">
+                      Document Info
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      {extractedData.title && (
+                        <div className="bg-white/5 rounded-lg p-3">
+                          <p className="text-xs text-gray-500">Title</p>
+                          <p className="font-medium">{extractedData.title}</p>
+                        </div>
+                      )}
+                      {extractedData.type && (
+                        <div className="bg-white/5 rounded-lg p-3">
+                          <p className="text-xs text-gray-500">Type</p>
+                          <p className="font-medium capitalize">{extractedData.type}</p>
+                        </div>
+                      )}
+                      {extractedData.date && (
+                        <div className="bg-white/5 rounded-lg p-3">
+                          <p className="text-xs text-gray-500">Date</p>
+                          <p className="font-medium">{extractedData.date}</p>
+                        </div>
+                      )}
+                      {extractedData.from && (
+                        <div className="bg-white/5 rounded-lg p-3">
+                          <p className="text-xs text-gray-500">From</p>
+                          <p className="font-medium">{extractedData.from}</p>
+                        </div>
+                      )}
+                      {extractedData.to && (
+                        <div className="bg-white/5 rounded-lg p-3">
+                          <p className="text-xs text-gray-500">To</p>
+                          <p className="font-medium">{extractedData.to}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Content */}
+                <div className="glass-card rounded-2xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-medium text-gray-400">
+                      Extracted Text
+                    </h3>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleCopy}
+                        className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition"
+                        title="Copy to clipboard"
+                      >
+                        {copied ? (
+                          <Check size={16} className="text-green-400" />
+                        ) : (
+                          <Copy size={16} className="text-gray-400" />
+                        )}
+                      </button>
+                      <button
+                        onClick={handleDownload}
+                        className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition"
+                        title="Download as text file"
+                      >
+                        <Download size={16} className="text-gray-400" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="bg-white/5 rounded-xl p-4 max-h-96 overflow-y-auto">
+                    <pre className="whitespace-pre-wrap text-sm font-mono text-gray-300">
+                      {extractedData.content}
+                    </pre>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {!isLoading && !extractedData && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="glass-card rounded-2xl p-12 text-center"
+              >
+                <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <FileText className="w-8 h-8 text-gray-600" />
+                </div>
+                <p className="text-gray-500">
+                  Upload a document to see extracted text here
+                </p>
+              </motion.div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
