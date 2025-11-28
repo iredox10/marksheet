@@ -38,9 +38,9 @@ Return the extracted text in this EXACT JSON format:
 }
 
 CRITICAL FORMATTING RULES:
-- Preserve ALL original line breaks by using \\n (escaped newline) in the JSON
+- Preserve ALL original line breaks by using \n (escaped newline) in the JSON
 - Maintain original spacing and indentation (use spaces to replicate indentation)
-- Keep blank lines/paragraph breaks using \\n\\n (double newline)
+- Keep blank lines/paragraph breaks using \n\n (double newline)
 - Preserve bullet points, numbers, or list formatting using the original characters
 - Maintain text alignment patterns using appropriate spacing
 - Preserve any special characters, dashes, underscores, or symbols
@@ -48,11 +48,11 @@ CRITICAL FORMATTING RULES:
 - Extract text EXACTLY as a human would read it from top to bottom, left to right
 
 CRITICAL JSON ESCAPING RULES:
-- Use \\n for newlines (NOT actual line breaks in the JSON string)
+- Use \n for newlines (NOT actual line breaks in the JSON string)
 - Use \" for quotes within text
-- Use \\\\ for backslashes
+- Use \\ for backslashes
 - Ensure all strings are properly escaped for valid JSON
-- Example: "content": "Line 1\\nLine 2\\n\\nParagraph 2"
+- Example: "content": "Line 1\nLine 2\n\nParagraph 2"
 
 CRITICAL OUTPUT RULES:
 - Return ONLY the JSON object
@@ -452,6 +452,11 @@ export function NotesPage() {
     pdf.save("extracted-notes.pdf");
   };
 
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (!extractedData) return;
+    setExtractedData({ ...extractedData, content: e.target.value });
+  };
+
   return (
     <div className="min-h-screen bg-[#111111] text-white font-sans selection:bg-white selection:text-black">
       {/* Header */}
@@ -760,10 +765,13 @@ export function NotesPage() {
                       </button>
                     </div>
                   </div>
-                  <div className="p-6 bg-[#111111] max-h-[500px] overflow-y-auto custom-scrollbar">
-                    <pre className="whitespace-pre-wrap text-sm font-mono text-neutral-300 leading-relaxed">
-                      {extractedData.content}
-                    </pre>
+                  <div className="p-0 bg-[#111111] h-[500px] flex flex-col">
+                    <textarea
+                      value={extractedData.content}
+                      onChange={handleContentChange}
+                      className="w-full h-full bg-[#111111] text-neutral-300 font-mono text-sm leading-relaxed p-6 resize-none outline-none border-none focus:text-white focus:bg-[#161616] transition-colors custom-scrollbar"
+                      spellCheck={false}
+                    />
                   </div>
                 </div>
               </motion.div>

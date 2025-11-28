@@ -197,6 +197,13 @@ export function AppPage() {
     setCropImageIndex(null);
   };
 
+  const handleCellChange = (rowIndex: number, header: string, value: string) => {
+    if (!extractedData) return;
+    const newData = [...extractedData.tableData];
+    newData[rowIndex] = { ...newData[rowIndex], [header]: value };
+    setExtractedData({ ...extractedData, tableData: newData });
+  };
+
   return (
     <div className="min-h-screen bg-[#111111] text-white font-sans selection:bg-white selection:text-black">
       {/* Header */}
@@ -394,7 +401,6 @@ export function AppPage() {
               }}
             />
 
-            {/* Error */}
             {error && (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -477,8 +483,13 @@ export function AppPage() {
                               className="border-b border-white/5 hover:bg-white/5 transition-colors"
                             >
                               {extractedData.tableHeaders.map((header) => (
-                                <td key={header} className="px-4 py-3 text-neutral-300 whitespace-nowrap border-r border-white/5 last:border-r-0">
-                                  {row[header] ?? "-"}
+                                <td key={header} className="px-4 py-3 text-neutral-300 whitespace-nowrap border-r border-white/5 last:border-r-0 p-0">
+                                  <input
+                                    type="text"
+                                    value={row[header] ?? ""}
+                                    onChange={(e) => handleCellChange(idx, header, e.target.value)}
+                                    className="w-full bg-transparent border-none outline-none text-neutral-300 focus:text-white focus:bg-white/10 px-1 py-0.5 transition-colors"
+                                  />
                                 </td>
                               ))}
                             </tr>
