@@ -53,33 +53,34 @@ export function ImageCropper({ imageSrc, onCropComplete, onCancel }: ImageCroppe
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-            <div className="bg-[hsl(var(--card))] rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-auto">
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="glass-card rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-auto shadow-2xl border border-zinc-800">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                        <CropIcon className="w-5 h-5 text-blue-400" />
-                        <h3 className="font-semibold">Crop Image</h3>
+                        <CropIcon className="w-5 h-5 text-zinc-100" />
+                        <h3 className="font-semibold text-zinc-100">Crop Image</h3>
                     </div>
                     <button
                         onClick={onCancel}
-                        className="p-2 hover:bg-white/10 rounded-lg transition"
+                        className="p-2 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 rounded-lg transition"
                     >
                         <X size={20} />
                     </button>
                 </div>
 
-                <div className="mb-4">
+                <div className="mb-6 bg-zinc-950/50 rounded-xl p-4 border border-zinc-800 flex items-center justify-center">
                     <ReactCrop
                         crop={crop}
                         onChange={c => setCrop(c)}
                         onComplete={c => setCompletedCrop(c)}
                         aspect={undefined}
+                        className="max-w-full"
                     >
                         <img
                             ref={imgRef}
                             src={imageSrc}
                             alt="Crop preview"
-                            className="max-w-full max-h-[60vh] object-contain"
+                            className="max-w-full max-h-[60vh] object-contain mx-auto"
                         />
                     </ReactCrop>
                 </div>
@@ -87,13 +88,13 @@ export function ImageCropper({ imageSrc, onCropComplete, onCancel }: ImageCroppe
                 <div className="flex gap-3 justify-end">
                     <button
                         onClick={onCancel}
-                        className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition"
+                        className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg transition border border-zinc-700"
                     >
                         Cancel
                     </button>
                     <button
                         onClick={handleCropComplete}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition flex items-center gap-2"
+                        className="px-4 py-2 bg-zinc-100 hover:bg-white text-zinc-900 rounded-lg transition flex items-center gap-2 shadow-lg shadow-white/10 font-medium"
                     >
                         <Check size={18} />
                         Apply Crop

@@ -16,6 +16,9 @@ import {
   Zap,
   Crop as CropIcon,
   Camera,
+  Sparkles,
+  FileDown,
+  FileType,
 } from "lucide-react";
 import { Document, Paragraph, TextRun, Packer } from "docx";
 import jsPDF from "jspdf";
@@ -58,58 +61,6 @@ CRITICAL OUTPUT RULES:
 - NO markdown code blocks
 - Start your response with { and end with }
 - Ensure the JSON is valid and parseable`;
-
-/* Gemini extraction function - currently unused, kept for reference
-async function extractNotes(
-  file: File,
-  apiKey: string
-): Promise<{ title?: string; content: string; type?: string; date?: string; from?: string; to?: string }> {
-  const arrayBuffer = await file.arrayBuffer();
-  const base64Image = btoa(
-    new Uint8Array(arrayBuffer).reduce(
-      (data, byte) => data + String.fromCharCode(byte),
-      ""
-    )
-  );
-  const mimeType = file.type || "image/jpeg";
-
-  const response = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=" +
-      apiKey,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: PROMPT },
-              {
-                inline_data: {
-                  mime_type: mimeType,
-                  data: base64Image,
-                },
-              },
-            ],
-          },
-        ],
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`API Error: ${error}`);
-  }
-
-  const result = await response.json();
-  const textContent = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
-  if (!textContent) throw new Error("No response from AI");
-
-  return parseJSONFromAI(textContent);
-}
-*/
 
 // Helper function to extract JSON from AI responses
 function parseJSONFromAI(textContent: string): any {
@@ -503,36 +454,49 @@ export function NotesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--background))]">
+    <div className="min-h-screen bg-zinc-950 text-zinc-50 selection:bg-emerald-500/30">
+      {/* Background Effects */}
+      <div className="fixed inset-0 z-0">
+        <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-emerald-600/10 blur-[120px]" />
+        <div className="absolute bottom-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-teal-600/10 blur-[120px]" />
+        <div className="absolute inset-0 grid-pattern opacity-20" />
+      </div>
+
       {/* Header */}
-      <header className="border-b border-white/10 bg-black/50 backdrop-blur-xl sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <header className="fixed top-0 left-0 right-0 z-50 glass-nav">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
               to="/app"
-              className="flex items-center gap-2 text-gray-400 hover:text-white transition"
+              className="flex items-center gap-2 text-zinc-400 hover:text-zinc-100 transition-colors group"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
               Back
             </Link>
-            <div className="w-px h-6 bg-white/10" />
+            <div className="w-px h-6 bg-zinc-800" />
             <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-purple-500" />
-              <span className="font-semibold">DocuScan</span>
+              <div className="w-6 h-6 rounded bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center">
+                <FileText className="w-3 h-3 text-white" />
+              </div>
+              <span className="font-bold text-zinc-100">DocuScan</span>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-6 py-12">
+      <div className="relative z-10 max-w-6xl mx-auto px-6 py-32">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-12"
         >
-          <h1 className="text-3xl font-bold mb-2">Extract Notes & Letters</h1>
-          <p className="text-gray-400">
-            Upload an image of handwritten or printed text
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-xs font-medium mb-6 backdrop-blur-sm">
+            <Sparkles className="w-3 h-3" />
+            <span>AI Text Extraction</span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-bold mb-4 text-zinc-100">Extract Notes & Letters</h1>
+          <p className="text-zinc-400 max-w-xl mx-auto">
+            Upload handwritten notes or printed documents. Our AI will preserve formatting and structure.
           </p>
         </motion.div>
 
@@ -544,12 +508,12 @@ export function NotesPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="glass-card rounded-2xl p-6"
+              className="glass-card rounded-3xl p-1 border border-zinc-800"
             >
               <div
-                className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${isDragging
-                  ? "border-blue-500 bg-blue-500/10"
-                  : "border-white/10 hover:border-white/30"
+                className={`rounded-[1.3rem] p-8 text-center cursor-pointer transition-all duration-300 border-2 border-dashed min-h-[300px] flex flex-col items-center justify-center ${isDragging
+                  ? "border-emerald-500 bg-emerald-500/10"
+                  : "border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-900/50"
                   }`}
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -566,49 +530,55 @@ export function NotesPage() {
                 onClick={() => document.getElementById("fileInput")?.click()}
               >
                 {previews.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="w-full grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {previews.map((src, idx) => (
-                      <div key={idx} className="relative group">
+                      <div key={idx} className="relative group aspect-[3/4]">
                         <img
                           src={src}
                           alt={`Preview ${idx + 1}`}
-                          className="w-full h-24 object-cover rounded-lg"
+                          className="w-full h-full object-cover rounded-xl border border-zinc-700 shadow-lg"
                         />
-                        <div className="absolute top-1 right-1 flex gap-1">
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-2 backdrop-blur-[2px]">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleCropImage(idx, src);
                             }}
-                            className="bg-blue-500 text-white p-1 rounded-full hover:bg-blue-600 transition opacity-0 group-hover:opacity-100"
+                            className="bg-white/10 text-white p-2 rounded-full hover:bg-white/20 transition backdrop-blur-md border border-white/10"
                             title="Crop image"
                           >
-                            <CropIcon size={12} />
+                            <CropIcon size={14} />
                           </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               removeFile(idx);
                             }}
-                            className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600 transition opacity-0 group-hover:opacity-100"
+                            className="bg-red-500/20 text-red-400 p-2 rounded-full hover:bg-red-500/30 transition backdrop-blur-md border border-red-500/20"
                           >
-                            <X size={12} />
+                            <X size={14} />
                           </button>
                         </div>
-                        <div className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-2 py-0.5 rounded">
-                          {idx + 1}
+                        <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded-full backdrop-blur-md border border-white/10">
+                          #{idx + 1}
                         </div>
                       </div>
                     ))}
+                    <div className="aspect-[3/4] rounded-xl border border-zinc-800 bg-zinc-900/30 flex flex-col items-center justify-center gap-2 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/50 transition-colors">
+                      <Upload className="w-6 h-6" />
+                      <span className="text-xs font-medium">Add More</span>
+                    </div>
                   </div>
                 ) : (
                   <>
-                    <Upload className="w-10 h-10 text-gray-500 mx-auto mb-4" />
-                    <p className="text-gray-400 mb-1">
-                      Drop images here or click to browse
+                    <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-6 shadow-xl">
+                      <Upload className="w-8 h-8 text-zinc-500" />
+                    </div>
+                    <p className="text-zinc-300 font-medium mb-2 text-lg">
+                      Drop images here
                     </p>
-                    <p className="text-xs text-gray-600">
-                      Supports multiple JPG, PNG, WebP files
+                    <p className="text-sm text-zinc-500 max-w-xs mx-auto">
+                      Support for JPG, PNG, WebP. Drag & drop or click to browse.
                     </p>
                   </>
                 )}
@@ -626,9 +596,9 @@ export function NotesPage() {
                 />
               </div>
               {selectedFiles.length > 0 && (
-                <div className="mt-3 flex items-center justify-between">
-                  <p className="text-sm text-gray-500 flex items-center gap-2">
-                    <ImageIcon size={14} />
+                <div className="px-6 py-4 border-t border-zinc-800 flex items-center justify-between bg-zinc-900/30 rounded-b-[1.3rem]">
+                  <p className="text-sm text-zinc-400 flex items-center gap-2">
+                    <ImageIcon size={14} className="text-emerald-500" />
                     {selectedFiles.length} file(s) selected
                   </p>
                   <button
@@ -636,7 +606,7 @@ export function NotesPage() {
                       e.stopPropagation();
                       clearAllFiles();
                     }}
-                    className="text-xs text-red-400 hover:text-red-300 transition"
+                    className="text-xs text-red-400 hover:text-red-300 transition font-medium"
                   >
                     Clear all
                   </button>
@@ -650,9 +620,9 @@ export function NotesPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
               onClick={() => document.getElementById("cameraInput")?.click()}
-              className="w-full glass-card rounded-xl p-4 flex items-center justify-center gap-2 hover:bg-white/5 transition"
+              className="w-full glass-card rounded-xl p-4 flex items-center justify-center gap-2 hover:bg-zinc-800/50 transition text-zinc-300 border border-zinc-800"
             >
-              <Camera className="w-5 h-5 text-blue-400" />
+              <Camera className="w-5 h-5 text-emerald-500" />
               <span className="text-sm font-medium">Take Photo</span>
             </motion.button>
 
@@ -669,26 +639,6 @@ export function NotesPage() {
               }}
             />
 
-            {/* Extraction Info */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-              className="glass-card rounded-2xl p-4 border-l-4 border-blue-500"
-            >
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0">
-                  <Zap className="w-5 h-5 text-blue-400 mt-0.5" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-200">Groq AI Extraction</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Fast and accurate text extraction with smart formatting
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-
             {/* Extract Button */}
             <motion.button
               initial={{ opacity: 0, y: 20 }}
@@ -696,7 +646,7 @@ export function NotesPage() {
               transition={{ delay: 0.3 }}
               onClick={handleExtract}
               disabled={selectedFiles.length === 0 || isLoading}
-              className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl font-medium transition flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 border border-emerald-500/20"
             >
               {isLoading ? (
                 <>
@@ -715,7 +665,7 @@ export function NotesPage() {
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-3 text-red-400"
+                className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center gap-3 text-red-400"
               >
                 <AlertCircle size={20} />
                 <span className="text-sm">{error}</span>
@@ -729,10 +679,16 @@ export function NotesPage() {
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="glass-card rounded-2xl p-12 text-center"
+                className="glass-card rounded-3xl border border-zinc-800 p-12 text-center h-full flex flex-col items-center justify-center min-h-[400px]"
               >
-                <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4 text-blue-500" />
-                <p className="text-gray-400">Reading your document...</p>
+                <div className="relative mb-6">
+                  <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full" />
+                  <Loader2 className="w-12 h-12 animate-spin text-emerald-500 relative z-10" />
+                </div>
+                <h3 className="text-xl font-bold text-zinc-100 mb-2">Analyzing Document</h3>
+                <p className="text-zinc-500 max-w-xs mx-auto">
+                  Our AI is reading the text and preserving formatting...
+                </p>
               </motion.div>
             )}
 
@@ -744,39 +700,40 @@ export function NotesPage() {
               >
                 {/* Metadata */}
                 {(extractedData.title || extractedData.date || extractedData.from || extractedData.to) && (
-                  <div className="glass-card rounded-2xl p-6">
-                    <h3 className="text-sm font-medium text-gray-400 mb-4">
-                      Document Info
+                  <div className="glass-card rounded-2xl border border-zinc-800 p-6">
+                    <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <FileType className="w-3 h-3" />
+                      Document Metadata
                     </h3>
                     <div className="grid grid-cols-2 gap-3">
                       {extractedData.title && (
-                        <div className="bg-white/5 rounded-lg p-3">
-                          <p className="text-xs text-gray-500">Title</p>
-                          <p className="font-medium">{extractedData.title}</p>
+                        <div className="bg-zinc-900/50 rounded-lg p-3 border border-zinc-800">
+                          <p className="text-xs text-zinc-500 mb-1">Title</p>
+                          <p className="font-medium text-zinc-200 text-sm truncate">{extractedData.title}</p>
                         </div>
                       )}
                       {extractedData.type && (
-                        <div className="bg-white/5 rounded-lg p-3">
-                          <p className="text-xs text-gray-500">Type</p>
-                          <p className="font-medium capitalize">{extractedData.type}</p>
+                        <div className="bg-zinc-900/50 rounded-lg p-3 border border-zinc-800">
+                          <p className="text-xs text-zinc-500 mb-1">Type</p>
+                          <p className="font-medium capitalize text-zinc-200 text-sm">{extractedData.type}</p>
                         </div>
                       )}
                       {extractedData.date && (
-                        <div className="bg-white/5 rounded-lg p-3">
-                          <p className="text-xs text-gray-500">Date</p>
-                          <p className="font-medium">{extractedData.date}</p>
+                        <div className="bg-zinc-900/50 rounded-lg p-3 border border-zinc-800">
+                          <p className="text-xs text-zinc-500 mb-1">Date</p>
+                          <p className="font-medium text-zinc-200 text-sm">{extractedData.date}</p>
                         </div>
                       )}
                       {extractedData.from && (
-                        <div className="bg-white/5 rounded-lg p-3">
-                          <p className="text-xs text-gray-500">From</p>
-                          <p className="font-medium">{extractedData.from}</p>
+                        <div className="bg-zinc-900/50 rounded-lg p-3 border border-zinc-800">
+                          <p className="text-xs text-zinc-500 mb-1">From</p>
+                          <p className="font-medium text-zinc-200 text-sm truncate">{extractedData.from}</p>
                         </div>
                       )}
                       {extractedData.to && (
-                        <div className="bg-white/5 rounded-lg p-3">
-                          <p className="text-xs text-gray-500">To</p>
-                          <p className="font-medium">{extractedData.to}</p>
+                        <div className="bg-zinc-900/50 rounded-lg p-3 border border-zinc-800">
+                          <p className="text-xs text-zinc-500 mb-1">To</p>
+                          <p className="font-medium text-zinc-200 text-sm truncate">{extractedData.to}</p>
                         </div>
                       )}
                     </div>
@@ -784,48 +741,50 @@ export function NotesPage() {
                 )}
 
                 {/* Content */}
-                <div className="glass-card rounded-2xl p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-medium text-gray-400">
-                      Extracted Text
+                <div className="glass-card rounded-3xl border border-zinc-800 p-1 overflow-hidden">
+                  <div className="bg-zinc-900/50 border-b border-zinc-800 p-4 flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-zinc-400 flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      Extracted Content
                     </h3>
                     <div className="flex gap-2">
                       <button
                         onClick={handleCopy}
-                        className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition"
+                        className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition text-zinc-400 hover:text-white"
                         title="Copy to clipboard"
                       >
                         {copied ? (
-                          <Check size={16} className="text-green-400" />
+                          <Check size={16} className="text-emerald-500" />
                         ) : (
                           <Copy size={16} />
                         )}
                       </button>
                       <button
                         onClick={handleDownload}
-                        className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition"
+                        className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition text-zinc-400 hover:text-white"
                         title="Download as TXT"
                       >
-                        <Download size={16} />
+                        <FileDown size={16} />
                       </button>
+                      <div className="w-px h-8 bg-zinc-800 mx-1" />
                       <button
                         onClick={handleExportDocx}
-                        className="px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition text-xs font-medium"
+                        className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded-lg transition text-xs font-medium"
                         title="Export as DOCX"
                       >
                         DOCX
                       </button>
                       <button
                         onClick={handleExportPdf}
-                        className="px-3 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition text-xs font-medium"
+                        className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg transition text-xs font-medium"
                         title="Export as PDF"
                       >
                         PDF
                       </button>
                     </div>
                   </div>
-                  <div className="bg-white/5 rounded-xl p-4 max-h-96 overflow-y-auto">
-                    <pre className="whitespace-pre-wrap text-sm font-mono text-gray-300">
+                  <div className="p-6 bg-zinc-950/50 max-h-[500px] overflow-y-auto custom-scrollbar">
+                    <pre className="whitespace-pre-wrap text-sm font-mono text-zinc-300 leading-relaxed">
                       {extractedData.content}
                     </pre>
                   </div>
@@ -837,13 +796,14 @@ export function NotesPage() {
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="glass-card rounded-2xl p-12 text-center"
+                className="glass-card rounded-3xl border border-zinc-800 p-12 text-center h-full flex flex-col items-center justify-center min-h-[400px]"
               >
-                <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <FileText className="w-8 h-8 text-gray-600" />
+                <div className="w-20 h-20 bg-zinc-900 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-zinc-800 shadow-inner">
+                  <FileText className="w-10 h-10 text-zinc-600" />
                 </div>
-                <p className="text-gray-500">
-                  Upload a document to see extracted text here
+                <h3 className="text-xl font-bold text-zinc-100 mb-2">No Content Yet</h3>
+                <p className="text-zinc-500 max-w-xs mx-auto">
+                  Upload a document and click "Extract Text" to see the results here.
                 </p>
               </motion.div>
             )}
