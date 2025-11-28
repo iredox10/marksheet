@@ -53,28 +53,30 @@ export function ImageCropper({ imageSrc, onCropComplete, onCancel }: ImageCroppe
     };
 
     return (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="glass-card rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-auto shadow-2xl border border-zinc-800">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                        <CropIcon className="w-5 h-5 text-zinc-100" />
-                        <h3 className="font-semibold text-zinc-100">Crop Image</h3>
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-6">
+            <div className="bg-[#111111] p-1 border border-white/10 w-full max-w-4xl max-h-[90vh] flex flex-col">
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#161616]">
+                    <div className="flex items-center gap-2 text-white uppercase tracking-widest text-xs font-bold">
+                        <CropIcon className="w-4 h-4" />
+                        <h3>Edit Source</h3>
                     </div>
                     <button
                         onClick={onCancel}
-                        className="p-2 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 rounded-lg transition"
+                        className="p-1 text-neutral-500 hover:text-white transition"
                     >
                         <X size={20} />
                     </button>
                 </div>
 
-                <div className="mb-6 bg-zinc-950/50 rounded-xl p-4 border border-zinc-800 flex items-center justify-center">
+                {/* Crop Area */}
+                <div className="p-6 bg-[#111111] flex-1 overflow-auto flex items-center justify-center">
                     <ReactCrop
                         crop={crop}
                         onChange={c => setCrop(c)}
                         onComplete={c => setCompletedCrop(c)}
                         aspect={undefined}
-                        className="max-w-full"
+                        className="max-w-full border border-white/10"
                     >
                         <img
                             ref={imgRef}
@@ -85,20 +87,24 @@ export function ImageCropper({ imageSrc, onCropComplete, onCancel }: ImageCroppe
                     </ReactCrop>
                 </div>
 
-                <div className="flex gap-3 justify-end">
-                    <button
-                        onClick={onCancel}
-                        className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg transition border border-zinc-700"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleCropComplete}
-                        className="px-4 py-2 bg-zinc-100 hover:bg-white text-zinc-900 rounded-lg transition flex items-center gap-2 shadow-lg shadow-white/10 font-medium"
-                    >
-                        <Check size={18} />
-                        Apply Crop
-                    </button>
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-white/10 bg-[#161616] flex justify-between items-center">
+                    <span className="text-[10px] text-neutral-500 font-mono">DRAG TO RESIZE SELECTION</span>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={onCancel}
+                            className="px-6 py-3 border border-white/10 hover:bg-white/5 text-neutral-400 hover:text-white text-xs font-bold uppercase tracking-widest transition"
+                        >
+                            Discard
+                        </button>
+                        <button
+                            onClick={handleCropComplete}
+                            className="px-6 py-3 bg-white hover:bg-neutral-200 text-black text-xs font-bold uppercase tracking-widest transition flex items-center gap-2"
+                        >
+                            <Check size={14} />
+                            Confirm Crop
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
