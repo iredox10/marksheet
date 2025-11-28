@@ -266,14 +266,26 @@ export function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-white/10 py-8 px-6">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-purple-500" />
             <span className="font-medium">DocuScan</span>
           </div>
-          <p className="text-sm text-gray-500">
-            © 2025 DocuScan. All rights reserved.
-          </p>
+          <div className="flex flex-col md:flex-row items-center gap-4 text-sm text-gray-500">
+            <p>© 2025 DocuScan. All rights reserved.</p>
+            <span className="hidden md:inline">•</span>
+            <p>
+              Built by{" "}
+              <a
+                href="https://iredox.tech"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-purple-400 hover:text-purple-300 transition"
+              >
+                iredox.tech
+              </a>
+            </p>
+          </div>
         </div>
       </footer>
     </div>

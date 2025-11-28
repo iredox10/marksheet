@@ -13,15 +13,12 @@ import {
   Check,
   Download,
   Image as ImageIcon,
-  Sparkles,
   Zap,
   Crop as CropIcon,
-  FileType,
   Camera,
 } from "lucide-react";
 import { Document, Paragraph, TextRun, Packer } from "docx";
 import jsPDF from "jspdf";
-import type { Provider } from "../types";
 import { ImageCropper } from "../components";
 
 const PROMPT = `You are an expert OCR system. Extract ALL text from this image EXACTLY as it appears on the paper.
@@ -62,6 +59,7 @@ CRITICAL OUTPUT RULES:
 - Start your response with { and end with }
 - Ensure the JSON is valid and parseable`;
 
+/* Gemini extraction function - currently unused, kept for reference
 async function extractNotes(
   file: File,
   apiKey: string
@@ -76,7 +74,8 @@ async function extractNotes(
   const mimeType = file.type || "image/jpeg";
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=" +
+      apiKey,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -85,11 +84,15 @@ async function extractNotes(
           {
             parts: [
               { text: PROMPT },
-              { inline_data: { mime_type: mimeType, data: base64Image } },
+              {
+                inline_data: {
+                  mime_type: mimeType,
+                  data: base64Image,
+                },
+              },
             ],
           },
         ],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 8192 },
       }),
     }
   );
@@ -104,12 +107,9 @@ async function extractNotes(
 
   if (!textContent) throw new Error("No response from AI");
 
-  let jsonStr = textContent;
-  const jsonMatch = textContent.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (jsonMatch) jsonStr = jsonMatch[1];
-
-  return JSON.parse(jsonStr.trim());
+  return parseJSONFromAI(textContent);
 }
+*/
 
 // Helper function to extract JSON from AI responses
 function parseJSONFromAI(textContent: string): any {
@@ -158,7 +158,6 @@ function parseJSONFromAI(textContent: string): any {
             valueStart++; // Move past the opening quote
 
             // Find the closing quote that's followed by comma or brace
-            let depth = 0;
             let i = valueStart;
             let content = '';
 
@@ -656,7 +655,7 @@ export function NotesPage() {
               <Camera className="w-5 h-5 text-blue-400" />
               <span className="text-sm font-medium">Take Photo</span>
             </motion.button>
-            
+
             <input
               type="file"
               id="cameraInput"
