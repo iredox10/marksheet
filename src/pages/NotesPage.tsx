@@ -39,6 +39,7 @@ Return the extracted text in this EXACT JSON format:
 
 CRITICAL FORMATTING RULES:
 - Preserve ALL original line breaks by using \n (escaped newline) in the JSON
+- DO NOT use HTML tags like <br>, <p>, <div>, etc. Use standard \n for line breaks.
 - Maintain original spacing and indentation (use spaces to replicate indentation)
 - Keep blank lines/paragraph breaks using \n\n (double newline)
 - Preserve bullet points, numbers, or list formatting using the original characters
@@ -78,7 +79,12 @@ function parseJSONFromAI(textContent: string): any {
   }
 
   try {
-    return JSON.parse(jsonStr);
+    const parsed = JSON.parse(jsonStr);
+    // Post-processing sanitization
+    if (parsed.content) {
+      parsed.content = parsed.content.replace(/<br\s*\/?>/gi, '\n');
+    }
+    return parsed;
   } catch (firstError) {
     console.warn("First parse failed, attempting to repair JSON...");
     console.warn("Raw JSON:", jsonStr.substring(0, 300));
@@ -133,6 +139,9 @@ function parseJSONFromAI(textContent: string): any {
       }
 
       if (repaired.content || repaired.title) {
+        if (repaired.content) {
+          repaired.content = repaired.content.replace(/<br\s*\/?>/gi, '\n');
+        }
         return repaired;
       }
 
