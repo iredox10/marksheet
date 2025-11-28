@@ -12,6 +12,7 @@ import {
   FileSpreadsheet,
   FileDown,
   Image as ImageIcon,
+  Crop as CropIcon,
 } from "lucide-react";
 import { extractData } from "../services/ai-ocr";
 import {
@@ -21,39 +22,59 @@ import {
   downloadBlob,
 } from "../services/export";
 import type { ExtractedData, Provider } from "../types";
+import { ImageCropper } from "../components";
 
 export function AppPage() {
   const apiKey = import.meta.env.VITE_GROQ_API_KEY || "";
   const provider: Provider = "groq";
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(
     null
   );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<string>("");
+  const [showCropper, setShowCropper] = useState(false);
+  const [cropImageIndex, setCropImageIndex] = useState<number | null>(null);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
 
-  const handleFile = (file: File) => {
-    if (file.type.startsWith("image/")) {
-      setSelectedFile(file);
+  const handleFile = (files: FileList | File[]) => {
+    const fileArray = Array.from(files).filter(f => f.type.startsWith("image/"));
+
+    if (fileArray.length === 0) return;
+
+    setSelectedFiles(prev => [...prev, ...fileArray]);
+
+    // Create previews for new files
+    fileArray.forEach(file => {
       const reader = new FileReader();
-      reader.onload = (e) => setPreview(e.target?.result as string);
+      reader.onload = (e) => {
+        setPreviews(prev => [...prev, e.target?.result as string]);
+      };
       reader.readAsDataURL(file);
-      setError(null);
-    }
+    });
+
+    setError(null);
   };
 
-  const clearFile = () => {
-    setSelectedFile(null);
-    setPreview(null);
+  const clearAllFiles = () => {
+    setSelectedFiles([]);
+    setPreviews([]);
     setExtractedData(null);
+    setProcessingStatus("");
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setPreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleExtract = async () => {
-    if (!selectedFile) {
-      setError("Please select an image");
+    if (selectedFiles.length === 0) {
+      setError("Please select at least one image");
       return;
     }
     if (!apiKey) {
@@ -66,10 +87,65 @@ export function AppPage() {
     setExtractedData(null);
 
     try {
-      const data = await extractData(selectedFile, apiKey, provider);
-      setExtractedData(data);
+      let mergedData: ExtractedData = {
+        tableHeaders: [],
+        tableData: [],
+        metadata: {},
+        summary: {},
+        remarks: {},
+      };
+
+      // Process each file sequentially
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        setProcessingStatus(`Processing ${i + 1} of ${selectedFiles.length}: ${file.name}`);
+
+        const data = await extractData(file, apiKey, provider);
+
+        if (i === 0) {
+          // First file - initialize with its data
+          mergedData = data;
+        } else {
+          // Subsequent files - merge data
+
+          // Merge table headers (use first file's headers as base)
+          if (data.tableHeaders.length > 0 && mergedData.tableHeaders.length === 0) {
+            mergedData.tableHeaders = data.tableHeaders;
+          }
+
+          // Append table rows
+          if (data.tableData && data.tableData.length > 0) {
+            mergedData.tableData = [...mergedData.tableData, ...data.tableData];
+          }
+
+          // Merge metadata (combine with file index)
+          if (data.metadata) {
+            Object.entries(data.metadata).forEach(([key, value]) => {
+              mergedData.metadata![`File${i + 1}_${key}`] = value;
+            });
+          }
+
+          // Aggregate summaries
+          if (data.summary) {
+            Object.entries(data.summary).forEach(([key, value]) => {
+              if (typeof value === 'number' && typeof mergedData.summary![key] === 'number') {
+                mergedData.summary![key] = (mergedData.summary![key] as number) + (value as number);
+              }
+            });
+          }
+
+          // Merge remarks
+          if (data.remarks) {
+            mergedData.remarks = { ...mergedData.remarks, ...data.remarks };
+          }
+        }
+      }
+
+      setExtractedData(mergedData);
+      setProcessingStatus(`Completed: Extracted data from ${selectedFiles.length} document(s)`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to extract data");
+      setProcessingStatus("");
     } finally {
       setIsLoading(false);
     }
@@ -96,6 +172,41 @@ export function AppPage() {
     }
 
     downloadBlob(blob, filename);
+  };
+
+  const handleCropImage = (index: number, preview: string) => {
+    setCropImageIndex(index);
+    setCropImageSrc(preview);
+    setShowCropper(true);
+  };
+
+  const handleCropComplete = (croppedBlob: Blob) => {
+    if (cropImageIndex === null) return;
+
+    // Convert blob to File
+    const croppedFile = new File(
+      [croppedBlob],
+      selectedFiles[cropImageIndex]?.name || "cropped.jpg",
+      { type: "image/jpeg" }
+    );
+
+    // Update the file at the specific index
+    setSelectedFiles(prev => prev.map((file, idx) =>
+      idx === cropImageIndex ? croppedFile : file
+    ));
+
+    // Update the preview at the specific index
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setPreviews(prev => prev.map((preview, idx) =>
+        idx === cropImageIndex ? (e.target?.result as string) : preview
+      ));
+    };
+    reader.readAsDataURL(croppedFile);
+
+    setShowCropper(false);
+    setCropImageSrc(null);
+    setCropImageIndex(null);
   };
 
   return (
@@ -143,11 +254,10 @@ export function AppPage() {
               className="glass-card rounded-2xl p-6"
             >
               <div
-                className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
-                  isDragging
-                    ? "border-purple-500 bg-purple-500/10"
-                    : "border-white/10 hover:border-white/30"
-                }`}
+                className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${isDragging
+                  ? "border-purple-500 bg-purple-500/10"
+                  : "border-white/10 hover:border-white/30"
+                  }`}
                 onDragOver={(e) => {
                   e.preventDefault();
                   setIsDragging(true);
@@ -156,36 +266,56 @@ export function AppPage() {
                 onDrop={(e) => {
                   e.preventDefault();
                   setIsDragging(false);
-                  const file = e.dataTransfer.files[0];
-                  if (file) handleFile(file);
+                  if (e.dataTransfer.files.length > 0) {
+                    handleFile(e.dataTransfer.files);
+                  }
                 }}
                 onClick={() => document.getElementById("fileInput")?.click()}
               >
-                {preview ? (
-                  <div className="relative">
-                    <img
-                      src={preview}
-                      alt="Preview"
-                      className="max-h-48 mx-auto rounded-lg"
-                    />
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        clearFile();
-                      }}
-                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition"
-                    >
-                      <X size={14} />
-                    </button>
+                {previews.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {previews.map((src, idx) => (
+                      <div key={idx} className="relative group">
+                        <img
+                          src={src}
+                          alt={`Preview ${idx + 1}`}
+                          className="w-full h-24 object-cover rounded-lg"
+                        />
+                        <div className="absolute top-1 right-1 flex gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCropImage(idx, src);
+                            }}
+                            className="bg-blue-500 text-white p-1 rounded-full hover:bg-blue-600 transition opacity-0 group-hover:opacity-100"
+                            title="Crop image"
+                          >
+                            <CropIcon size={12} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeFile(idx);
+                            }}
+                            className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600 transition opacity-0 group-hover:opacity-100"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                        <div className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-2 py-0.5 rounded">
+                          {idx + 1}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <>
                     <Upload className="w-10 h-10 text-gray-500 mx-auto mb-4" />
                     <p className="text-gray-400 mb-1">
-                      Drop your image here or click to browse
+                      Drop images here or click to browse
                     </p>
                     <p className="text-xs text-gray-600">
-                      Supports JPG, PNG, WebP
+                      Supports multiple JPG, PNG, WebP files
                     </p>
                   </>
                 )}
@@ -193,19 +323,31 @@ export function AppPage() {
                   type="file"
                   id="fileInput"
                   accept="image/*"
+                  multiple
                   className="hidden"
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFile(file);
+                    if (e.target.files && e.target.files.length > 0) {
+                      handleFile(e.target.files);
+                    }
                   }}
-                  capture="environment"
                 />
               </div>
-              {selectedFile && (
-                <p className="text-sm text-gray-500 mt-3 flex items-center gap-2">
-                  <ImageIcon size={14} />
-                  {selectedFile.name}
-                </p>
+              {selectedFiles.length > 0 && (
+                <div className="mt-3 flex items-center justify-between">
+                  <p className="text-sm text-gray-500 flex items-center gap-2">
+                    <ImageIcon size={14} />
+                    {selectedFiles.length} file(s) selected
+                  </p>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearAllFiles();
+                    }}
+                    className="text-xs text-red-400 hover:text-red-300 transition"
+                  >
+                    Clear all
+                  </button>
+                </div>
               )}
             </motion.div>
 
@@ -215,13 +357,13 @@ export function AppPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
               onClick={handleExtract}
-              disabled={!selectedFile || isLoading}
+              disabled={selectedFiles.length === 0 || isLoading}
               className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl font-medium transition flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="animate-spin" size={20} />
-                  Analyzing...
+                  {processingStatus || "Analyzing..."}
                 </>
               ) : (
                 <>
@@ -399,6 +541,19 @@ export function AppPage() {
           </div>
         </div>
       </div>
+
+      {/* Image Cropper Modal */}
+      {showCropper && cropImageSrc && (
+        <ImageCropper
+          imageSrc={cropImageSrc}
+          onCropComplete={handleCropComplete}
+          onCancel={() => {
+            setShowCropper(false);
+            setCropImageSrc(null);
+            setCropImageIndex(null);
+          }}
+        />
+      )}
     </div>
   );
 }

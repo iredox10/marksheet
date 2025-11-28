@@ -15,8 +15,13 @@ import {
   Image as ImageIcon,
   Sparkles,
   Zap,
+  Crop as CropIcon,
+  FileType,
 } from "lucide-react";
+import { Document, Paragraph, TextRun, Packer } from "docx";
+import jsPDF from "jspdf";
 import type { Provider } from "../types";
+import { ImageCropper } from "../components";
 
 const PROMPT = `You are an expert OCR system. Extract ALL text from this image EXACTLY as it appears on the paper.
 
@@ -244,11 +249,10 @@ async function extractWithGroq(
 }
 
 export function NotesPage() {
-  const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
   const groqApiKey = import.meta.env.VITE_GROQ_API_KEY || "";
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
   const [extractedData, setExtractedData] = useState<{
     title?: string;
     content: string;
@@ -261,31 +265,49 @@ export function NotesPage() {
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showCropper, setShowCropper] = useState(false);
+  const [cropImageIndex, setCropImageIndex] = useState<number | null>(null);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [processingStatus, setProcessingStatus] = useState<string>("");
 
-  const handleFile = (file: File) => {
-    if (file.type.startsWith("image/")) {
-      setSelectedFile(file);
+  const handleFile = (files: FileList | File[]) => {
+    const fileArray = Array.from(files).filter(f => f.type.startsWith("image/"));
+
+    if (fileArray.length === 0) return;
+
+    setSelectedFiles(prev => [...prev, ...fileArray]);
+
+    fileArray.forEach(file => {
       const reader = new FileReader();
-      reader.onload = (e) => setPreview(e.target?.result as string);
+      reader.onload = (e) => {
+        setPreviews(prev => [...prev, e.target?.result as string]);
+      };
       reader.readAsDataURL(file);
-      setError(null);
-    }
+    });
+
+    setError(null);
   };
 
-  const clearFile = () => {
-    setSelectedFile(null);
-    setPreview(null);
+  const clearAllFiles = () => {
+    setSelectedFiles([]);
+    setPreviews([]);
     setExtractedData(null);
+    setProcessingStatus("");
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setPreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleExtract = async () => {
-    if (!selectedFile) {
-      setError("Please select an image");
+    if (selectedFiles.length === 0) {
+      setError("Please select at least one image");
       return;
     }
 
-    if (!groqApiKey || !geminiApiKey) {
-      setError("Please add both Groq and Gemini API keys to .env file");
+    if (!groqApiKey) {
+      setError("Please add your Groq API key to .env file");
       return;
     }
 
@@ -294,19 +316,33 @@ export function NotesPage() {
     setExtractedData(null);
 
     try {
-      // Step 1: Extract raw text with Groq (fast & accurate)
-      const rawData = await extractWithGroq(selectedFile, groqApiKey);
+      let combinedContent = "";
+      let lastData: any = null;
 
-      // Step 2: Format with Gemini (intelligent structuring)
-      const formattedData = await extractNotes(selectedFile, geminiApiKey);
+      // Process each file sequentially
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        setProcessingStatus(`Processing ${i + 1} of ${selectedFiles.length}: ${file.name}`);
 
-      // Combine: use Gemini's metadata but prefer Groq's raw content if available
+        const data = await extractWithGroq(file, groqApiKey);
+        lastData = data;
+
+        // Concatenate content with separator
+        if (i > 0) {
+          combinedContent += "\n\n--- Document " + (i + 1) + " ---\n\n";
+        }
+        combinedContent += data.content;
+      }
+
+      // Use metadata from last file but combined content
       setExtractedData({
-        ...formattedData,
-        content: rawData.content || formattedData.content,
+        ...lastData,
+        content: combinedContent,
       });
+      setProcessingStatus(`Completed: Extracted text from ${selectedFiles.length} document(s)`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to extract text");
+      setProcessingStatus("");
     } finally {
       setIsLoading(false);
     }
@@ -330,6 +366,140 @@ export function NotesPage() {
     a.download = "extracted-text.txt";
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleCropImage = (index: number, preview: string) => {
+    setCropImageIndex(index);
+    setCropImageSrc(preview);
+    setShowCropper(true);
+  };
+
+  const handleCropComplete = (croppedBlob: Blob) => {
+    if (cropImageIndex === null) return;
+
+    const croppedFile = new File(
+      [croppedBlob],
+      selectedFiles[cropImageIndex]?.name || "cropped.jpg",
+      { type: "image/jpeg" }
+    );
+
+    setSelectedFiles(prev => prev.map((file, idx) =>
+      idx === cropImageIndex ? croppedFile : file
+    ));
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setPreviews(prev => prev.map((preview, idx) =>
+        idx === cropImageIndex ? (e.target?.result as string) : preview
+      ));
+    };
+    reader.readAsDataURL(croppedFile);
+
+    setShowCropper(false);
+    setCropImageSrc(null);
+    setCropImageIndex(null);
+  };
+
+  const handleExportDocx = async () => {
+    if (!extractedData) return;
+
+    const paragraphs: Paragraph[] = [];
+
+    // Add metadata
+    if (extractedData.title) {
+      paragraphs.push(
+        new Paragraph({
+          children: [new TextRun({ text: extractedData.title, bold: true, size: 32 })],
+        })
+      );
+    }
+    if (extractedData.date || extractedData.from || extractedData.to) {
+      paragraphs.push(new Paragraph({ text: "" })); // Empty line
+    }
+    if (extractedData.date) {
+      paragraphs.push(new Paragraph({ text: `Date: ${extractedData.date}` }));
+    }
+    if (extractedData.from) {
+      paragraphs.push(new Paragraph({ text: `From: ${extractedData.from}` }));
+    }
+    if (extractedData.to) {
+      paragraphs.push(new Paragraph({ text: `To: ${extractedData.to}` }));
+    }
+
+    // Add content
+    paragraphs.push(new Paragraph({ text: "" })); // Empty line
+    const contentLines = extractedData.content.split("\n");
+    contentLines.forEach(line => {
+      paragraphs.push(new Paragraph({ text: line }));
+    });
+
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: paragraphs,
+      }],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "extracted-notes.docx";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportPdf = () => {
+    if (!extractedData) return;
+
+    const pdf = new jsPDF();
+    let yPosition = 20;
+
+    // Add metadata
+    if (extractedData.title) {
+      pdf.setFontSize(16);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(extractedData.title, 20, yPosition);
+      yPosition += 10;
+    }
+
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "normal");
+
+    if (extractedData.date) {
+      pdf.text(`Date: ${extractedData.date}`, 20, yPosition);
+      yPosition += 6;
+    }
+    if (extractedData.from) {
+      pdf.text(`From: ${extractedData.from}`, 20, yPosition);
+      yPosition += 6;
+    }
+    if (extractedData.to) {
+      pdf.text(`To: ${extractedData.to}`, 20, yPosition);
+      yPosition += 6;
+    }
+
+    yPosition += 4; // Extra space
+
+    // Add content with text wrapping
+    const contentLines = extractedData.content.split("\n");
+    const pageHeight = pdf.internal.pageSize.height;
+    const margin = 20;
+    const maxWidth = pdf.internal.pageSize.width - 2 * margin;
+
+    contentLines.forEach(line => {
+      const wrappedLines = pdf.splitTextToSize(line || " ", maxWidth);
+      wrappedLines.forEach((wrappedLine: string) => {
+        if (yPosition > pageHeight - 20) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+        pdf.text(wrappedLine, margin, yPosition);
+        yPosition += 6;
+      });
+    });
+
+    pdf.save("extracted-notes.pdf");
   };
 
   return (
@@ -389,36 +559,56 @@ export function NotesPage() {
                 onDrop={(e) => {
                   e.preventDefault();
                   setIsDragging(false);
-                  const file = e.dataTransfer.files[0];
-                  if (file) handleFile(file);
+                  if (e.dataTransfer.files.length > 0) {
+                    handleFile(e.dataTransfer.files);
+                  }
                 }}
                 onClick={() => document.getElementById("fileInput")?.click()}
               >
-                {preview ? (
-                  <div className="relative">
-                    <img
-                      src={preview}
-                      alt="Preview"
-                      className="max-h-48 mx-auto rounded-lg"
-                    />
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        clearFile();
-                      }}
-                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition"
-                    >
-                      <X size={14} />
-                    </button>
+                {previews.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {previews.map((src, idx) => (
+                      <div key={idx} className="relative group">
+                        <img
+                          src={src}
+                          alt={`Preview ${idx + 1}`}
+                          className="w-full h-24 object-cover rounded-lg"
+                        />
+                        <div className="absolute top-1 right-1 flex gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCropImage(idx, src);
+                            }}
+                            className="bg-blue-500 text-white p-1 rounded-full hover:bg-blue-600 transition opacity-0 group-hover:opacity-100"
+                            title="Crop image"
+                          >
+                            <CropIcon size={12} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeFile(idx);
+                            }}
+                            className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600 transition opacity-0 group-hover:opacity-100"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                        <div className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-2 py-0.5 rounded">
+                          {idx + 1}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <>
                     <Upload className="w-10 h-10 text-gray-500 mx-auto mb-4" />
                     <p className="text-gray-400 mb-1">
-                      Drop your note or letter here
+                      Drop images here or click to browse
                     </p>
                     <p className="text-xs text-gray-600">
-                      Supports JPG, PNG, WebP
+                      Supports multiple JPG, PNG, WebP files
                     </p>
                   </>
                 )}
@@ -426,19 +616,31 @@ export function NotesPage() {
                   type="file"
                   id="fileInput"
                   accept="image/*"
+                  multiple
                   className="hidden"
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFile(file);
+                    if (e.target.files && e.target.files.length > 0) {
+                      handleFile(e.target.files);
+                    }
                   }}
-                  capture="environment"
                 />
               </div>
-              {selectedFile && (
-                <p className="text-sm text-gray-500 mt-3 flex items-center gap-2">
-                  <ImageIcon size={14} />
-                  {selectedFile.name}
-                </p>
+              {selectedFiles.length > 0 && (
+                <div className="mt-3 flex items-center justify-between">
+                  <p className="text-sm text-gray-500 flex items-center gap-2">
+                    <ImageIcon size={14} />
+                    {selectedFiles.length} file(s) selected
+                  </p>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearAllFiles();
+                    }}
+                    className="text-xs text-red-400 hover:text-red-300 transition"
+                  >
+                    Clear all
+                  </button>
+                </div>
               )}
             </motion.div>
 
@@ -454,9 +656,9 @@ export function NotesPage() {
                   <Zap className="w-5 h-5 text-blue-400 mt-0.5" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-200">Hybrid AI Extraction</p>
+                  <p className="text-sm font-medium text-gray-200">Groq AI Extraction</p>
                   <p className="text-xs text-gray-500 mt-1">
-                    Uses Groq for accurate text extraction + Gemini for smart formatting
+                    Fast and accurate text extraction with smart formatting
                   </p>
                 </div>
               </div>
@@ -466,15 +668,15 @@ export function NotesPage() {
             <motion.button
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
+              transition={{ delay: 0.3 }}
               onClick={handleExtract}
-              disabled={!selectedFile || isLoading}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl font-medium transition flex items-center justify-center gap-2"
+              disabled={selectedFiles.length === 0 || isLoading}
+              className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl font-medium transition flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="animate-spin" size={20} />
-                  Processing with AI...
+                  {processingStatus || "Extracting..."}
                 </>
               ) : (
                 <>
@@ -571,15 +773,29 @@ export function NotesPage() {
                         {copied ? (
                           <Check size={16} className="text-green-400" />
                         ) : (
-                          <Copy size={16} className="text-gray-400" />
+                          <Copy size={16} />
                         )}
                       </button>
                       <button
                         onClick={handleDownload}
                         className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition"
-                        title="Download as text file"
+                        title="Download as TXT"
                       >
-                        <Download size={16} className="text-gray-400" />
+                        <Download size={16} />
+                      </button>
+                      <button
+                        onClick={handleExportDocx}
+                        className="px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition text-xs font-medium"
+                        title="Export as DOCX"
+                      >
+                        DOCX
+                      </button>
+                      <button
+                        onClick={handleExportPdf}
+                        className="px-3 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition text-xs font-medium"
+                        title="Export as PDF"
+                      >
+                        PDF
                       </button>
                     </div>
                   </div>
@@ -609,6 +825,18 @@ export function NotesPage() {
           </div>
         </div>
       </div>
+
+      {/* Image Cropper Modal */}
+      {showCropper && cropImageSrc && (
+        <ImageCropper
+          imageSrc={cropImageSrc}
+          onCropComplete={handleCropComplete}
+          onCancel={() => {
+            setShowCropper(false);
+            setCropImageSrc(null);
+          }}
+        />
+      )}
     </div>
   );
 }
