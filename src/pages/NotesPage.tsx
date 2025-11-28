@@ -13,26 +13,48 @@ import {
   Check,
   Download,
   Image as ImageIcon,
+  Sparkles,
+  Zap,
 } from "lucide-react";
 import type { Provider } from "../types";
 
-const PROMPT = `You are an expert OCR system. Extract ALL text from this image exactly as written.
+const PROMPT = `You are an expert OCR system. Extract ALL text from this image EXACTLY as it appears on the paper.
 
-Return the extracted text in this JSON format:
+CRITICAL: Return ONLY a valid JSON object with PROPERLY ESCAPED strings.
+
+Return the extracted text in this EXACT JSON format:
 {
   "title": "Document title if visible (optional)",
-  "content": "The full extracted text content",
+  "content": "The full extracted text content with PRESERVED formatting",
   "type": "letter/memo/note/other",
   "date": "Date if visible (optional)",
   "from": "Sender if visible (optional)",
   "to": "Recipient if visible (optional)"
 }
 
-IMPORTANT:
-- Preserve the original formatting and line breaks where possible
-- Extract ALL text visible in the image
-- Handle handwritten text carefully
-- Return ONLY valid JSON`;
+CRITICAL FORMATTING RULES:
+- Preserve ALL original line breaks by using \\n (escaped newline) in the JSON
+- Maintain original spacing and indentation (use spaces to replicate indentation)
+- Keep blank lines/paragraph breaks using \\n\\n (double newline)
+- Preserve bullet points, numbers, or list formatting using the original characters
+- Maintain text alignment patterns using appropriate spacing
+- Preserve any special characters, dashes, underscores, or symbols
+- DO NOT reformat, reorganize, or "clean up" the text
+- Extract text EXACTLY as a human would read it from top to bottom, left to right
+
+CRITICAL JSON ESCAPING RULES:
+- Use \\n for newlines (NOT actual line breaks in the JSON string)
+- Use \\" for quotes within text
+- Use \\\\ for backslashes
+- Ensure all strings are properly escaped for valid JSON
+- Example: "content": "Line 1\\nLine 2\\n\\nParagraph 2"
+
+CRITICAL OUTPUT RULES:
+- Return ONLY the JSON object
+- NO explanatory text before or after the JSON
+- NO markdown code blocks
+- Start your response with { and end with }
+- Ensure the JSON is valid and parseable`;
 
 async function extractNotes(
   file: File,
@@ -83,8 +105,147 @@ async function extractNotes(
   return JSON.parse(jsonStr.trim());
 }
 
+// Helper function to extract JSON from AI responses
+function parseJSONFromAI(textContent: string): any {
+  let jsonStr = textContent.trim();
+
+  // Try to extract from markdown code blocks first
+  const markdownMatch = textContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (markdownMatch) {
+    jsonStr = markdownMatch[1].trim();
+  } else {
+    // Look for JSON object pattern
+    const jsonMatch = textContent.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[0].trim();
+    }
+  }
+
+  try {
+    return JSON.parse(jsonStr);
+  } catch (firstError) {
+    console.warn("First parse failed, attempting to repair JSON...");
+    console.warn("Raw JSON:", jsonStr.substring(0, 300));
+
+    try {
+      // Manual JSON repair - extract fields one by one
+      const repaired: any = {};
+
+      // Extract simple fields (title, type, date, from, to)
+      const simpleFields = ['title', 'type', 'date', 'from', 'to'];
+      simpleFields.forEach(field => {
+        const regex = new RegExp(`"${field}"\\s*:\\s*"([^"]*)"`, 'i');
+        const match = jsonStr.match(regex);
+        if (match) {
+          repaired[field] = match[1];
+        }
+      });
+
+      // Extract content field specially (it likely has unescaped newlines)
+      const contentMatch = jsonStr.match(/"content"\s*:\s*"([\s\S]*?)"\s*[,}]/);
+      if (contentMatch) {
+        // The content might span multiple lines - take everything until we hit ",\n" or "}\n"
+        let contentStart = jsonStr.indexOf('"content"');
+        if (contentStart !== -1) {
+          let valueStart = jsonStr.indexOf('"', contentStart + 9);
+          if (valueStart !== -1) {
+            valueStart++; // Move past the opening quote
+
+            // Find the closing quote that's followed by comma or brace
+            let depth = 0;
+            let i = valueStart;
+            let content = '';
+
+            while (i < jsonStr.length) {
+              const char = jsonStr[i];
+
+              // Check for end of string value
+              if (char === '"' && jsonStr[i - 1] !== '\\') {
+                // Check if this is followed by , or }
+                const nextNonWhite = jsonStr.substring(i + 1).match(/\S/);
+                if (nextNonWhite && (nextNonWhite[0] === ',' || nextNonWhite[0] === '}')) {
+                  break;
+                }
+              }
+
+              content += char;
+              i++;
+            }
+
+            repaired.content = content;
+          }
+        }
+      }
+
+      if (repaired.content || repaired.title) {
+        return repaired;
+      }
+
+      throw new Error("Could not extract content from response");
+    } catch (secondError) {
+      console.error("Failed to repair JSON:", jsonStr);
+      console.error("Errors:", firstError, secondError);
+      throw new Error("AI returned invalid JSON. Please try again.");
+    }
+  }
+}
+
+async function extractWithGroq(
+  file: File,
+  apiKey: string
+): Promise<{ title?: string; content: string; type?: string; date?: string; from?: string; to?: string }> {
+  const arrayBuffer = await file.arrayBuffer();
+  const base64Image = btoa(
+    new Uint8Array(arrayBuffer).reduce(
+      (data, byte) => data + String.fromCharCode(byte),
+      ""
+    )
+  );
+  const mimeType = file.type || "image/jpeg";
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "meta-llama/llama-4-scout-17b-16e-instruct",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: PROMPT },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${mimeType};base64,${base64Image}`,
+              },
+            },
+          ],
+        },
+      ],
+      temperature: 0.1,
+      max_tokens: 8192,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Groq API Error: ${error}`);
+  }
+
+  const result = await response.json();
+  const textContent = result.choices?.[0]?.message?.content;
+
+  if (!textContent) throw new Error("No response from AI");
+
+  return parseJSONFromAI(textContent);
+}
+
 export function NotesPage() {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+  const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+  const groqApiKey = import.meta.env.VITE_GROQ_API_KEY || "";
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -122,8 +283,9 @@ export function NotesPage() {
       setError("Please select an image");
       return;
     }
-    if (!apiKey) {
-      setError("Please enter your API key");
+
+    if (!groqApiKey || !geminiApiKey) {
+      setError("Please add both Groq and Gemini API keys to .env file");
       return;
     }
 
@@ -132,8 +294,17 @@ export function NotesPage() {
     setExtractedData(null);
 
     try {
-      const data = await extractNotes(selectedFile, apiKey);
-      setExtractedData(data);
+      // Step 1: Extract raw text with Groq (fast & accurate)
+      const rawData = await extractWithGroq(selectedFile, groqApiKey);
+
+      // Step 2: Format with Gemini (intelligent structuring)
+      const formattedData = await extractNotes(selectedFile, geminiApiKey);
+
+      // Combine: use Gemini's metadata but prefer Groq's raw content if available
+      setExtractedData({
+        ...formattedData,
+        content: rawData.content || formattedData.content,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to extract text");
     } finally {
@@ -206,11 +377,10 @@ export function NotesPage() {
               className="glass-card rounded-2xl p-6"
             >
               <div
-                className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
-                  isDragging
-                    ? "border-blue-500 bg-blue-500/10"
-                    : "border-white/10 hover:border-white/30"
-                }`}
+                className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${isDragging
+                  ? "border-blue-500 bg-blue-500/10"
+                  : "border-white/10 hover:border-white/30"
+                  }`}
                 onDragOver={(e) => {
                   e.preventDefault();
                   setIsDragging(true);
@@ -272,6 +442,26 @@ export function NotesPage() {
               )}
             </motion.div>
 
+            {/* Extraction Info */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="glass-card rounded-2xl p-4 border-l-4 border-blue-500"
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  <Zap className="w-5 h-5 text-blue-400 mt-0.5" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-200">Hybrid AI Extraction</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Uses Groq for accurate text extraction + Gemini for smart formatting
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+
             {/* Extract Button */}
             <motion.button
               initial={{ opacity: 0, y: 20 }}
@@ -284,7 +474,7 @@ export function NotesPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="animate-spin" size={20} />
-                  Extracting...
+                  Processing with AI...
                 </>
               ) : (
                 <>
