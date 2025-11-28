@@ -13,6 +13,7 @@ import {
   FileDown,
   Image as ImageIcon,
   Crop as CropIcon,
+  Camera,
 } from "lucide-react";
 import { extractData } from "../services/ai-ocr";
 import {
@@ -350,6 +351,31 @@ export function AppPage() {
                 </div>
               )}
             </motion.div>
+
+            {/* Camera Button */}
+            <motion.button
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              onClick={() => document.getElementById("cameraInput")?.click()}
+              className="w-full glass-card rounded-xl p-4 flex items-center justify-center gap-2 hover:bg-white/5 transition"
+            >
+              <Camera className="w-5 h-5 text-blue-400" />
+              <span className="text-sm font-medium">Take Photo</span>
+            </motion.button>
+
+            <input
+              type="file"
+              id="cameraInput"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                  handleFile(e.target.files);
+                }
+              }}
+            />
 
             {/* Extract Button */}
             <motion.button

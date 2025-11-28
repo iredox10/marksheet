@@ -17,6 +17,7 @@ import {
   Zap,
   Crop as CropIcon,
   FileType,
+  Camera,
 } from "lucide-react";
 import { Document, Paragraph, TextRun, Packer } from "docx";
 import jsPDF from "jspdf";
@@ -643,6 +644,31 @@ export function NotesPage() {
                 </div>
               )}
             </motion.div>
+
+            {/* Camera Button */}
+            <motion.button
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              onClick={() => document.getElementById("cameraInput")?.click()}
+              className="w-full glass-card rounded-xl p-4 flex items-center justify-center gap-2 hover:bg-white/5 transition"
+            >
+              <Camera className="w-5 h-5 text-blue-400" />
+              <span className="text-sm font-medium">Take Photo</span>
+            </motion.button>
+            
+            <input
+              type="file"
+              id="cameraInput"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                  handleFile(e.target.files);
+                }
+              }}
+            />
 
             {/* Extraction Info */}
             <motion.div
