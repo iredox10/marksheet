@@ -264,35 +264,35 @@ export function AppPage() {
                 {previews.length > 0 ? (
                   <div className="w-full grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {previews.map((src, idx) => (
-                      <div key={idx} className="relative group aspect-[3/4]">
+                      <div key={idx} className="relative group aspect-[3/4] border border-white/10 bg-[#161616]">
                         <img
                           src={src}
                           alt={`Preview ${idx + 1}`}
-                          className="w-full h-full object-cover border border-white/10 grayscale group-hover:grayscale-0 transition-all duration-500"
+                          className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500 opacity-80 group-hover:opacity-100"
                         />
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <div className="absolute top-2 right-2 flex gap-2">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleCropImage(idx, src);
                             }}
-                            className="p-2 hover:text-white text-neutral-400 transition"
+                            className="p-2 bg-black/50 hover:bg-black text-white backdrop-blur-sm border border-white/10 transition"
                             title="Crop"
                           >
-                            <CropIcon size={16} />
+                            <CropIcon size={14} />
                           </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               removeFile(idx);
                             }}
-                            className="p-2 hover:text-white text-neutral-400 transition"
+                            className="p-2 bg-red-500/20 hover:bg-red-500/40 text-red-200 backdrop-blur-sm border border-red-500/20 transition"
                             title="Remove"
                           >
-                            <X size={16} />
+                            <X size={14} />
                           </button>
                         </div>
-                        <div className="absolute top-2 left-2 text-[10px] font-mono text-white bg-black/80 px-1">
+                        <div className="absolute bottom-2 left-2 text-[10px] font-mono text-white bg-black/80 px-1 border border-white/10">
                           {idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
                         </div>
                       </div>
@@ -308,7 +308,7 @@ export function AppPage() {
                       <Upload className="w-5 h-5 text-neutral-400" />
                     </div>
                     <p className="text-white text-sm uppercase tracking-widest mb-2">
-                      Upload Source
+                      Upload Multiple Files (Batch)
                     </p>
                     <p className="text-xs text-neutral-600 font-mono">
                       JPG, PNG, WEBP SUPPORTED

@@ -1,5 +1,6 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   FileSpreadsheet,
   Zap,
@@ -8,7 +9,10 @@ import {
   ChevronRight,
   Code,
   Layers,
-  Cpu
+  Cpu,
+  FileText,
+  Scan,
+  Database
 } from "lucide-react";
 
 const features = [
@@ -30,6 +34,15 @@ const features = [
 ];
 
 export function LandingPage() {
+  const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStep((prev) => (prev + 1) % 3);
+    }, 3000); // Cycle every 3 seconds
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#111111] text-white font-sans selection:bg-white selection:text-black">
       {/* Navbar */}
@@ -79,9 +92,9 @@ export function LandingPage() {
                 transition={{ duration: 0.5, delay: 0.1 }}
                 className="text-6xl md:text-7xl font-light tracking-tighter mb-8 leading-[0.9] text-white"
               >
-                UNSTRUCTURED
+                AI-POWERED
                 <br />
-                <span className="text-neutral-500">TO STRUCTURED</span>
+                <span className="text-neutral-500">DOCUMENT INTELLIGENCE</span>
               </motion.h1>
 
               <motion.p
@@ -90,8 +103,8 @@ export function LandingPage() {
                 transition={{ duration: 0.5, delay: 0.2 }}
                 className="text-lg text-neutral-400 mb-12 leading-relaxed font-light max-w-md"
               >
-                Automate data extraction pipelines with high-fidelity OCR. 
-                Transform static documents into actionable datasets instantly.
+                Enterprise-grade OCR engine for automated data extraction. 
+                Convert unstructured documents into clean, actionable datasets.
               </motion.p>
 
               <motion.div
@@ -116,67 +129,114 @@ export function LandingPage() {
               </motion.div>
             </div>
 
-            {/* Hero Visual */}
+            {/* Hero Visual Animation */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.8, delay: 0.4 }}
-              className="relative hidden md:block"
+              className="relative hidden md:block h-[400px] flex items-center justify-center"
             >
-              <div className="absolute inset-0 bg-gradient-to-tr from-neutral-800/20 to-transparent" />
-              <div className="border border-white/10 bg-[#111111] p-1 relative">
-                {/* Terminal-like Header */}
-                <div className="h-8 border-b border-white/10 bg-[#1a1a1a] flex items-center px-4 justify-between">
+              {/* Background Grid */}
+              <div className="absolute inset-0 grid grid-cols-8 grid-rows-8 opacity-20">
+                {[...Array(64)].map((_, i) => (
+                    <div key={i} className="border-[0.5px] border-white/10" />
+                ))}
+              </div>
+
+              {/* Animation Container */}
+              <div className="relative w-full max-w-md bg-[#111111] border border-white/10 p-1 overflow-hidden">
+                 {/* Header */}
+                 <div className="h-8 border-b border-white/10 bg-[#161616] flex items-center px-4 justify-between relative z-20">
                   <div className="flex gap-2">
                      <div className="w-2 h-2 rounded-full bg-neutral-600" />
                      <div className="w-2 h-2 rounded-full bg-neutral-600" />
                   </div>
-                  <span className="text-[10px] font-mono text-neutral-500">OUTPUT_PREVIEW.json</span>
+                  <span className="text-[10px] font-mono text-neutral-500">PROCESS_MONITOR.exe</span>
                 </div>
-                
-                {/* Code Preview */}
-                <div className="p-6 font-mono text-xs md:text-sm text-neutral-400 space-y-2">
-                  <div className="flex">
-                    <span className="text-neutral-600 w-8">01</span>
-                    <span className="text-blue-400">{"{"}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="text-neutral-600 w-8">02</span>
-                    <span className="pl-4 text-neutral-300">"status"</span>: <span className="text-emerald-400">"success"</span>,
-                  </div>
-                  <div className="flex">
-                    <span className="text-neutral-600 w-8">03</span>
-                    <span className="pl-4 text-neutral-300">"confidence"</span>: <span className="text-yellow-400">0.998</span>,
-                  </div>
-                  <div className="flex">
-                    <span className="text-neutral-600 w-8">04</span>
-                    <span className="pl-4 text-neutral-300">"data"</span>: <span className="text-blue-400">{"["}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="text-neutral-600 w-8">05</span>
-                    <span className="pl-8 text-neutral-300">{"{"}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="text-neutral-600 w-8">06</span>
-                    <span className="pl-12 text-neutral-300">"student"</span>: <span className="text-white">"Alex Chen"</span>,
-                  </div>
-                  <div className="flex">
-                    <span className="text-neutral-600 w-8">07</span>
-                    <span className="pl-12 text-neutral-300">"grade"</span>: <span className="text-white">"A+"</span>
-                  </div>
-                  <div className="flex">
-                    <span className="text-neutral-600 w-8">08</span>
-                    <span className="pl-8 text-neutral-300">{"}"}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="text-neutral-600 w-8">09</span>
-                    <span className="pl-4 text-blue-400">{"]"}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="text-neutral-600 w-8">10</span>
-                    <span className="text-blue-400">{"}"}</span>
-                  </div>
-                  <div className="h-4 w-2 bg-white animate-pulse mt-2" />
+
+                <div className="h-[300px] relative flex items-center justify-center p-8">
+                  <AnimatePresence mode="wait">
+                    {step === 0 && (
+                      <motion.div
+                        key="input"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="flex flex-col items-center"
+                      >
+                        <div className="w-24 h-32 border-2 border-white/20 bg-white/5 flex items-center justify-center mb-4 relative">
+                           <FileText className="w-10 h-10 text-neutral-400" />
+                           <div className="absolute -right-2 -bottom-2 w-8 h-8 bg-white text-black flex items-center justify-center font-bold text-xs">
+                             PDF
+                           </div>
+                        </div>
+                        <p className="text-xs font-mono text-neutral-500 uppercase tracking-widest">Ingesting Document...</p>
+                      </motion.div>
+                    )}
+
+                    {step === 1 && (
+                      <motion.div
+                        key="process"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex flex-col items-center w-full h-full justify-center relative"
+                      >
+                         <div className="absolute inset-0 flex items-center justify-center">
+                            <Scan className="w-32 h-32 text-white/10" />
+                         </div>
+                         
+                         {/* Scanning Line */}
+                         <motion.div 
+                           className="w-48 h-0.5 bg-white shadow-[0_0_15px_rgba(255,255,255,0.8)] absolute"
+                           animate={{ top: ["20%", "80%", "20%"] }}
+                           transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                         />
+
+                         <div className="mt-32 font-mono text-xs text-white bg-black/50 px-2 py-1 border border-white/10">
+                            OCR_CONFIDENCE: 99.8%
+                         </div>
+                      </motion.div>
+                    )}
+
+                    {step === 2 && (
+                      <motion.div
+                        key="output"
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="w-full font-mono text-xs space-y-2"
+                      >
+                        <div className="flex items-center gap-2 mb-4 text-emerald-500">
+                          <Database className="w-4 h-4" />
+                          <span className="uppercase tracking-widest">Extraction Complete</span>
+                        </div>
+                        <div className="space-y-1 p-4 bg-[#161616] border border-white/5 text-neutral-400">
+                           <p><span className="text-blue-400">{"{"}</span></p>
+                           <p className="pl-4"><span className="text-white">"id"</span>: "DOC_001",</p>
+                           <p className="pl-4"><span className="text-white">"type"</span>: "invoice",</p>
+                           <p className="pl-4"><span className="text-white">"total"</span>: 1250.00,</p>
+                           <p className="pl-4"><span className="text-white">"date"</span>: "2025-02-28",</p>
+                           <p className="pl-4"><span className="text-white">"items"</span>: <span className="text-yellow-400">[...]</span></p>
+                           <p><span className="text-blue-400">{"}"}</span></p>
+                        </div>
+                        <div className="w-full bg-emerald-500/20 h-1 mt-2">
+                           <motion.div 
+                             className="h-full bg-emerald-500" 
+                             initial={{ width: 0 }}
+                             animate={{ width: "100%" }}
+                           />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="h-1 w-full bg-[#161616] flex">
+                   <div className={`h-full transition-all duration-500 ${step >= 0 ? 'bg-white w-1/3' : 'bg-transparent'}`} />
+                   <div className={`h-full transition-all duration-500 ${step >= 1 ? 'bg-white w-1/3' : 'bg-transparent'}`} />
+                   <div className={`h-full transition-all duration-500 ${step >= 2 ? 'bg-white w-1/3' : 'bg-transparent'}`} />
                 </div>
               </div>
             </motion.div>
@@ -249,15 +309,73 @@ export function LandingPage() {
               </div>
             </div>
             
-            <div className="relative flex items-center justify-center bg-[#161616] border border-white/5">
+            <div className="relative flex items-center justify-center bg-[#161616] border border-white/5 min-h-[400px] overflow-hidden">
+                {/* Background Grid */}
                 <div className="absolute inset-0 grid grid-cols-6 grid-rows-6">
                     {[...Array(36)].map((_, i) => (
                         <div key={i} className="border-[0.5px] border-white/5" />
                     ))}
                 </div>
-                <div className="relative z-10 text-center">
-                    <div className="text-6xl font-bold text-white/10 font-mono">API</div>
-                    <div className="text-xs text-neutral-600 uppercase tracking-widest mt-2">Ready Architecture</div>
+                
+                {/* Animation Container */}
+                <div className="relative z-10 w-full max-w-xs">
+                  <AnimatePresence mode="wait">
+                    {step === 0 && (
+                      <motion.div
+                        key="arch-input"
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 1.1 }}
+                        className="flex flex-col items-center"
+                      >
+                        {/* Visual for Unstructured Data */}
+                        <div className="grid grid-cols-2 gap-2 mb-4">
+                           <div className="w-12 h-16 border border-white/20 bg-white/5 flex items-center justify-center"><FileText className="text-neutral-600" /></div>
+                           <div className="w-12 h-16 border border-white/20 bg-white/5 flex items-center justify-center rotate-6"><FileText className="text-neutral-600" /></div>
+                        </div>
+                        <div className="text-xs font-mono text-neutral-500 uppercase tracking-widest">Unstructured Blob</div>
+                      </motion.div>
+                    )}
+
+                    {step === 1 && (
+                       <motion.div
+                        key="arch-process"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex flex-col items-center"
+                       >
+                         {/* Visual for Processing */}
+                         <Cpu className="w-20 h-20 text-white mb-4 animate-pulse" />
+                         <div className="text-xs font-mono text-neutral-500 uppercase tracking-widest">Normalization</div>
+                       </motion.div>
+                    )}
+
+                    {step === 2 && (
+                       <motion.div
+                        key="arch-output"
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex flex-col items-center w-full"
+                       >
+                         {/* Visual for Excel/Table */}
+                         <div className="w-full bg-[#111111] border border-white/20 p-1 mb-4">
+                            <div className="grid grid-cols-3 gap-px bg-white/20 border border-white/20">
+                                {[...Array(9)].map((_, i) => (
+                                    <div key={i} className="bg-[#111111] h-8 flex items-center justify-center text-[8px] text-neutral-400 font-mono">
+                                        {i < 3 ? ["NAME", "DATE", "VAL"][i] : "---"}
+                                    </div>
+                                ))}
+                            </div>
+                         </div>
+                         <div className="flex items-center justify-center gap-2 text-emerald-500">
+                            <FileSpreadsheet className="w-4 h-4" />
+                            <span className="text-xs font-mono uppercase tracking-widest">.XLSX Generated</span>
+                         </div>
+                       </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
             </div>
           </div>
