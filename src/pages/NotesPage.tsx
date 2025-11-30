@@ -11,7 +11,6 @@ import {
   X,
   Copy,
   Check,
-  Download,
   Image as ImageIcon,
   Crop as CropIcon,
   Camera,
