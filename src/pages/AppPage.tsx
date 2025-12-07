@@ -218,7 +218,7 @@ export function AppPage() {
               Back
             </Link>
             <div className="w-px h-4 bg-white/20" />
-            <span className="font-bold text-white text-sm tracking-tight">DOCUSCAN / TABLE</span>
+            <span className="font-bold text-white text-sm tracking-tight">DOCUSCAN <span className="text-neutral-500">/</span> TABLE</span>
           </div>
         </div>
       </header>

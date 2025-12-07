@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { LandingPage, SelectTypePage, AppPage, NotesPage } from "./pages";
+import { LandingPage, SelectTypePage, AppPage, NotesPage, ConvertPage } from "./pages";
 
 function App() {
   return (
@@ -9,6 +9,7 @@ function App() {
         <Route path="/app" element={<SelectTypePage />} />
         <Route path="/app/table" element={<AppPage />} />
         <Route path="/app/notes" element={<NotesPage />} />
+        <Route path="/app/convert" element={<ConvertPage />} />
       </Routes>
     </BrowserRouter>
   );

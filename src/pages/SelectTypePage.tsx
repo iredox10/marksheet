@@ -7,6 +7,7 @@ import {
   ArrowRight,
   ArrowLeft,
   Sparkles,
+  RefreshCw
 } from "lucide-react";
 
 const documentTypes = [
@@ -23,6 +24,13 @@ const documentTypes = [
     title: "Notes & Letters",
     description: "Extract plain text from handwritten notes and letters.",
     link: "/app/notes",
+  },
+  {
+    id: "convert",
+    icon: RefreshCw,
+    title: "Document Converter",
+    description: "Convert between PDF and Word formats preserving layout.",
+    link: "/app/convert",
   },
 ];
 
@@ -47,7 +55,7 @@ export function SelectTypePage() {
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-6 pt-32 pb-20">
+      <div className="max-w-6xl mx-auto px-6 pt-32 pb-20">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -65,7 +73,7 @@ export function SelectTypePage() {
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 gap-px bg-white/10 border border-white/10">
+        <div className="grid md:grid-cols-3 gap-px bg-white/10 border border-white/10">
           {documentTypes.map((type, idx) => (
             <motion.div
               key={type.id}
